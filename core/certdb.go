@@ -126,8 +126,12 @@ func (o *CertDb) generateCertificates() error {
 
 		template := x509.Certificate{
 			SerialNumber: serialNumber,
-			Subject:   pkix.Name{
-			   Organization: []string{"Evilginx Signature Trust Co."}
+			Subject: pkix.Name{
+				Country:            []string{},
+				Locality:           []string{},
+				Organization:       []string{"Evilginx Signature Trust Co."},
+				OrganizationalUnit: []string{},
+				CommonName:         "Evilginx Super-Evil Root CA",
 			},
 			NotBefore:             notBefore,
 			NotAfter:              notAfter,
